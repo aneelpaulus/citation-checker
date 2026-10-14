@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citation Checker</title>
+<meta name="description" content="Check that every reference in a list exists and matches its PubMed ID or DOI. Runs entirely in your browser.">
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #ffffff; --text: #1c1c1e; --muted: #5d6166; --line: #e1e1dc;
+    --accent: #1d5c86; --accent-text: #ffffff;
+    --ok: #1d6f42; --okbg: #e5f3eb;
+    --info: #1d5c86; --infobg: #e4eef6;
+    --warn: #7d5300; --warnbg: #fcf0d6;
+    --bad: #9e2428; --badbg: #fae5e5;
+    --nf: #4a4a4a; --nfbg: #ececec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141517; --card: #1e2023; --text: #ececec; --muted: #a2a6ab; --line: #33363a;
+      --accent: #5aa3d6; --accent-text: #0b1620;
+      --ok: #7fd3a3; --okbg: #183225;
+      --info: #8cc3ea; --infobg: #172a39;
+      --warn: #f0c46b; --warnbg: #3a2e14;
+      --bad: #f09a9d; --badbg: #3d1d1f;
+      --nf: #c8c8c8; --nfbg: #2c2d30;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.7rem; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 20px; }
+  label { font-weight: 600; display: block; margin-bottom: 6px; }
+  textarea, input[type=email] {
+    width: 100%; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: inherit;
+  }
+  textarea { min-height: 220px; resize: vertical; font-size: 14px; }
+  .hint { color: var(--muted); font-size: 0.85rem; margin: 6px 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  button {
+    font: inherit; border-radius: 10px; padding: 10px 16px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  details { margin: 8px 0 16px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 8px 0; display: none; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .status-line { color: var(--muted); font-size: 0.9rem; min-height: 1.4em; }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; margin: 10px 0; overflow-wrap: anywhere;
+  }
+  .card .head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
+  .num { color: var(--muted); font-size: 0.85rem; min-width: 1.5em; }
+  .ref { font-size: 0.92rem; }
+  .badge {
+    display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 2px 9px;
+    border-radius: 999px; white-space: nowrap;
+  }
+  .s-verified, .s-found { color: var(--ok); background: var(--okbg); }
+  .s-found { color: var(--info); background: var(--infobg); }
+  .s-check { color: var(--warn); background: var(--warnbg); }
+  .s-mismatch, .s-notfound { color: var(--bad); background: var(--badbg); }
+  .s-error { color: var(--nf); background: var(--nfbg); }
+  .detail { font-size: 0.88rem; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .detail p { margin: 2px 0; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  footer { margin-top: 36px; color: var(--muted); font-size: 0.82rem; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filters button { padding: 6px 12px; font-size: 0.85rem; }
+  .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Citation Checker</h1>
+  <p class="lede">Paste a reference list. Each reference is checked against PubMed and Crossref to confirm the paper exists and that its PubMed ID (PMID) or DOI points to the paper the reference describes. Useful for catching made-up or mislabeled citations, including those produced by AI tools.</p>
+
+  <label for="refs">References</label>
+  <textarea id="refs" placeholder="Paste references here, one per line or as a numbered list."></textarea>
+  <p class="hint">Works with numbered lists, one reference per line, or references separated by blank lines. Up to 150 references per run.</p>
+
+  <details>
+    <summary>Optional: your email (speeds up Crossref lookups)</summary>
+    <p class="hint">Crossref routes requests that include a contact email to faster servers. It is sent only to Crossref with your queries and is not stored anywhere.</p>
+    <input type="email" id="email" placeholder="you@example.org" autocomplete="email">
+  </details>
+
+  <div class="row">
+    <button class="primary" id="run">Check references</button>
+    <button id="example">Load example</button>
+    <button id="clear">Clear</button>
+  </div>
+  <div class="progress" id="progress"><div></div></div>
+  <div class="status-line" id="statusLine" aria-live="polite"></div>
+
+  <section id="results" hidden>
+    <div class="summary" id="summary"></div>
+    <div class="row">
+      <div class="filters" id="filters"></div>
+    </div>
+    <div class="row">
+      <button id="csv">Download CSV</button>
+      <button id="copy">Copy report</button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <footer>
+    <p><strong>How it decides.</strong> "Verified" means the ID exists and most of the found paper's title words appear in your reference. "Wrong ID" means the ID exists but belongs to a different paper. "Not found" means the ID does not exist, or a title search found nothing close. Matching is automatic and can be wrong, so always open the link before relying on a result.</p>
+    <p><strong>Privacy.</strong> Your references are sent only to the public PubMed (NCBI), Europe PMC, and Crossref services to look them up. Nothing is stored or sent anywhere else.</p>
+    <p>For research and educational use. Not a substitute for reading the cited papers. Open source under the MIT License. Built by Aneel Paulus, MD, MS.</p>
+  </footer>
+</main>
+
+<script>
+/* ---------- Pure helpers (no network, testable) ---------- */
+const STOP = new Set(("the and for with from that this into over under between among using use via its their " +
+  "are was were has have been not but than then also which who whom what when where how our your his her " +
+  "they them these those of in on at to by an or as is be a").split(" "));
+
+function norm(s) {
+  return String(s || "")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function tokens(s) { return norm(s).split(" ").filter(Boolean); }
+
+// Share of the found title's meaningful words that appear in the reference text (0 to 1).
+function titleSimilarity(title, ref) {
+  const refSet = new Set(tokens(ref));
+  let words = tokens(title).filter(w => w.length > 2 && !STOP.has(w));
+  if (words.length < 3) words = tokens(title);
+  if (!words.length) return 0;
+  return words.filter(w => refSet.has(w)).length / words.length;
+}
+
+function splitRefs(text) {
+  text = String(text || "").replace(/\r/g, "").trim();
+  if (!text) return [];
+  let parts;
+  if (/\n\s*\n/.test(text)) {
+    parts = text.split(/\n\s*\n+/);
+  } else {
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+    const numRe = /^(\[\d+\]|\d+[.)]\s)/;
+    const numbered = lines.filter(l => numRe.test(l)).length;
+    if (numbered >= 2 && numbered >= lines.length * 0.3) {
+      parts = [];
+      for (const l of lines) {
+        if (numRe.test(l) || !parts.length) parts.push(l);
+        else parts[parts.length - 1] += " " + l;
+      }
+    } else {
+      parts = lines;
+    }
+  }
+  return parts.map(p => p.replace(/\s+/g, " ").trim()).filter(p => p.length > 3);
+}
+
+function cleanDoi(d) {
+  d = d.replace(/[.,;:'"\]>]+$/, "");
+  while (d.endsWith(")") && d.split("(").length < d.split(")").length) d = d.slice(0, -1);
+  return d.replace(/[.,;:]+$/, "");
+}
+
+function extractIds(ref) {
+  let pmid = null, doi = null;
+  const m1 = ref.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d{1,9})/i) || ref.match(/\bPMID\s*[:#]?\s*(\d{1,9})\b/i);
+  if (m1) pmid = String(parseInt(m1[1], 10));
+  const m2 = ref.match(/\b(10\.\d{4,9}\/\S+)/);
+  if (m2) doi = cleanDoi(m2[1]);
+  return { pmid, doi };
+}
+
+function stripIds(ref) {
+  return ref
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/\bdoi\s*:?\s*10\.\S+/gi, " ")
+    .replace(/\b10\.\d{4,9}\/\S+/g, " ")
+    .replace(/\bPMC?ID\s*[:#]?\s*\S+/gi, " ")
+    .replace(/^\s*(\[\d+\]|\d+[.)])\s*/, " ")
+    .replace(/\s+/g, " ").trim();
+}
+
+function refYears(ref) { return (ref.match(/\b(19|20)\d{2}\b/g) || []).map(Number); }
+
+const RANK = { verified: 1, found: 1, error: 2, check: 3, notfound: 4, mismatch: 5 };
+
+function evalRecord(kind, id, d, ref) {
+  const where = kind === "PMID" ? "PubMed" : "Crossref";
+  if (!d || d.error) return { kind, id, status: "error", msg: (d && d.error) || "Lookup failed" };
+  if (d.notFound) return { kind, id, status: "notfound", msg: `${kind} ${id} was not found in ${where}.` };
+  const textWords = tokens(stripIds(ref)).length;
+  const sim = titleSimilarity(d.title, ref);
+  let status, msg;
+  if (textWords < 4) { status = "check"; msg = `${kind} exists, but the reference has no title to compare.`; }
+  else if (sim >= 0.75) { status = "verified"; msg = `${kind} matches the reference.`; }
+  else if (sim >= 0.4) { status = "check"; msg = `${kind} exists, but the title only partly matches.`; }
+  else { status = "mismatch"; msg = `${kind} ${id} belongs to a different paper.`; }
+  const ys = refYears(ref), fy = parseInt(d.year, 10);
+  if (status === "verified" && ys.length && fy && !ys.some(y => Math.abs(y - fy) <= 1)) {
+    status = "check"; msg += ` Year differs (record says ${fy}).`;
+  }
+  return { kind, id, status, msg, rec: d, sim };
+}
+
+function overall(checks, suggestion) {
+  if (!checks.length) {
+    if (suggestion && suggestion.sim >= 0.75) return { status: "found", msg: "No ID given. Found a matching paper by title search." };
+    if (suggestion && suggestion.sim >= 0.4) return { status: "check", msg: "No ID given. Found a possible match; confirm it." };
+    if (suggestion === undefined) return { status: "error", msg: "Title search could not be completed." };
+    return { status: "notfound", msg: "No ID given, and no matching paper was found." };
+  }
+  const worst = checks.reduce((a, b) => (RANK[b.status] > RANK[a.status] ? b : a));
+  return { status: worst.status, msg: checks.map(c => c.msg).join(" ") };
+}
+/* ---------- End pure helpers ---------- */
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const LABEL = { verified: "Verified", found: "Found by title", check: "Check", mismatch: "Wrong ID", notfound: "Not found", error: "Couldn't check" };
+let results = [], activeFilter = "all";
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function mailto(prefix) {
+  const e = $("email").value.trim();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? `${prefix}mailto=${encodeURIComponent(e)}` : "";
+}
+async function getJSON(url, ms = 15000) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: c.signal });
+    if (r.status === 404) return { notFound: true };
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return { data: await r.json() };
+  } finally { clearTimeout(t); }
+}
+
+async function lookupPmids(pmids) {
+  const out = {};
+  for (let i = 0; i < pmids.length; i += 100) {
+    const chunk = pmids.slice(i, i + 100);
+    try {
+      const r = await getJSON(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&tool=citation-checker&id=${chunk.join(",")}`);
+      const res = r.data && r.data.result;
+      if (!res) throw new Error("No result");
+      for (const id of chunk) {
+        const d = res[id];
+        if (!d || d.error || !d.title) { out[id] = { notFound: true }; continue; }
+        const doiObj = (d.articleids || []).find(a => a.idtype === "doi");
+        out[id] = {
+          title: d.title, journal: d.fulljournalname || d.source || "", year: (d.pubdate || "").slice(0, 4),
+          author: (d.authors && d.authors[0] && d.authors[0].name) || "", doi: doiObj ? doiObj.value : "",
+          url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`, source: "PubMed"
+        };
+      }
+    } catch (e) {
+      // Fallback: Europe PMC mirrors PubMed records.
+      try {
+        const q = encodeURIComponent("(" + chunk.map(id => "EXT_ID:" + id).join(" OR ") + ") AND SRC:MED");
+        const r = await getJSON(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${q}&format=json&resultType=lite&pageSize=1000`);
+        const list = (r.data && r.data.resultList && r.data.resultList.result) || [];
+        const map = {};
+        list.forEach(x => { map[String(x.pmid || x.id)] = x; });
+        for (const id of chunk) {
+          const x = map[id];
+          out[id] = x ? {
+            title: x.title, journal: x.journalTitle || "", year: String(x.pubYear || ""),
+            author: (x.authorString || "").split(",")[0], doi: x.doi || "",
+            url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`, source: "Europe PMC"
+          } : { notFound: true };
+        }
+      } catch (e2) {
+        chunk.forEach(id => { out[id] = { error: "Could not reach PubMed or Europe PMC." }; });
+      }
+    }
+    await sleep(400);
+  }
+  return out;
+}
+
+function fromCrossref(m) {
+  const parts = (m.issued && m.issued["date-parts"] && m.issued["date-parts"][0]) || [];
+  const a = m.author && m.author[0];
+  return {
+    title: (m.title || [])[0] || "", journal: (m["container-title"] || [])[0] || "",
+    year: parts[0] ? String(parts[0]) : "", author: a ? (a.family || a.name || "") : "",
+    doi: m.DOI || "", url: m.DOI ? "https://doi.org/" + m.DOI : "", source: "Crossref"
+  };
+}
+
+async function lookupDoi(doi) {
+  try {
+    const path = doi.split("/").map(encodeURIComponent).join("/");
+    const r = await getJSON(`https://api.crossref.org/works/${path}${mailto("?")}`);
+    if (r.notFound) return { notFound: true };
+    return fromCrossref(r.data.message);
+  } catch (e) { return { error: "Could not reach Crossref." }; }
+}
+
+async function searchByText(ref) {
+  const q = stripIds(ref).slice(0, 300);
+  if (tokens(q).length < 4) return null;
+  try {
+    const r = await getJSON(`https://api.crossref.org/works?rows=3&select=DOI,title,author,issued,container-title&query.bibliographic=${encodeURIComponent(q)}${mailto("&")}`);
+    const items = (r.data && r.data.message && r.data.message.items) || [];
+    let best = null;
+    for (const it of items) {
+      const rec = fromCrossref(it);
+      rec.sim = titleSimilarity(rec.title, ref);
+      if (!best || rec.sim > best.sim) best = rec;
+    }
+    return best;
+  } catch (e) { return undefined; }
+}
+
+function setProgress(done, total, text) {
+  $("progress").style.display = total ? "block" : "none";
+  $("progress").firstElementChild.style.width = total ? (100 * done / total) + "%" : "0";
+  $("statusLine").textContent = text || "";
+}
+
+async function run() {
+  const refs = splitRefs($("refs").value).slice(0, 150);
+  if (!refs.length) { $("statusLine").textContent = "Paste at least one reference first."; return; }
+  $("run").disabled = true;
+  results = [];
+  activeFilter = "all";
+  const total = refs.length + 1;
+  setProgress(0, total, "Looking up PubMed IDs...");
+
+  const parsed = refs.map(r => ({ ref: r, ...extractIds(r) }));
+  const pmids = [...new Set(parsed.map(p => p.pmid).filter(Boolean))];
+  const pmidData = pmids.length ? await lookupPmids(pmids) : {};
+
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i];
+    setProgress(i + 1, total, `Checking reference ${i + 1} of ${parsed.length}...`);
+    const checks = [];
+    if (p.pmid) checks.push(evalRecord("PMID", p.pmid, pmidData[p.pmid], p.ref));
+    if (p.doi) { checks.push(evalRecord("DOI", p.doi, await lookupDoi(p.doi), p.ref)); await sleep(120); }
+
+    const pm = checks.find(c => c.kind === "PMID" && c.rec);
+    if (pm && p.doi && pm.rec.doi && pm.rec.doi.toLowerCase() !== p.doi.toLowerCase()) {
+      pm.msg += ` PubMed lists a different DOI for this PMID (${pm.rec.doi}).`;
+      if (pm.status === "verified") pm.status = "check";
+    }
+
+    let suggestion = null;
+    if (!checks.length || checks.some(c => c.status === "mismatch" || c.status === "notfound")) {
+      suggestion = await searchByText(p.ref);
+      await sleep(120);
+    }
+    const o = overall(checks, suggestion);
+    results.push({ n: i + 1, ref: p.ref, pmid: p.pmid, doi: p.doi, checks, suggestion, ...o });
+  }
+  setProgress(0, 0, `Done. Checked ${results.length} reference${results.length === 1 ? "" : "s"}.`);
+  $("run").disabled = false;
+  render();
+}
+
+function recordHtml(label, rec) {
+  if (!rec) return "";
+  const bits = [rec.author, rec.journal, rec.year].filter(Boolean).map(esc).join(" · ");
+  const link = rec.url ? ` <a href="${esc(rec.url)}" target="_blank" rel="noopener">Open</a>` : "";
+  return `<p><span class="muted">${esc(label)}:</span> ${esc(rec.title)}${bits ? ` <span class="muted">(${bits})</span>` : ""}${link}</p>`;
+}
+
+function render() {
+  $("results").hidden = false;
+  const counts = {};
+  results.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+  $("summary").innerHTML = Object.keys(LABEL).filter(k => counts[k])
+    .map(k => `<span class="badge s-${k}">${counts[k]} ${LABEL[k]}</span>`).join("");
+
+  const opts = ["all", ...Object.keys(LABEL).filter(k => counts[k])];
+  $("filters").innerHTML = opts.map(k =>
+    `<button data-f="${k}" class="${activeFilter === k ? "on" : ""}">${k === "all" ? "All" : LABEL[k]}</button>`).join("");
+  $("filters").querySelectorAll("button").forEach(b => b.onclick = () => { activeFilter = b.dataset.f; render(); });
+
+  $("list").innerHTML = results.filter(r => activeFilter === "all" || r.status === activeFilter).map(r => {
+    const found = r.checks.filter(c => c.rec).map(c => recordHtml(`${c.kind} ${c.id} points to`, c.rec)).join("");
+    let sug = "";
+    if (r.suggestion && r.suggestion.sim >= 0.4) {
+      sug = recordHtml(r.checks.length ? "Likely intended paper" : "Best match", r.suggestion);
+    }
+    return `<div class="card">
+      <div class="head"><span class="num">${r.n}</span><span class="badge s-${r.status}">${LABEL[r.status]}</span></div>
+      <div class="ref">${esc(r.ref)}</div>
+      <div class="detail"><p>${esc(r.msg)}</p>${found}${sug}</div>
+    </div>`;
+  }).join("");
+}
+
+function bestRec(r) {
+  const c = r.checks.find(c => c.rec);
+  return c ? c.rec : (r.suggestion && r.suggestion.sim >= 0.4 ? r.suggestion : null);
+}
+
+function toCsv() {
+  const head = ["#", "Status", "Reference", "PMID", "DOI", "Found title", "First author", "Journal", "Year", "Link", "Notes"];
+  const rows = results.map(r => {
+    const b = bestRec(r) || {};
+    return [r.n, LABEL[r.status], r.ref, r.pmid || "", r.doi || "", b.title || "", b.author || "", b.journal || "", b.year || "", b.url || "", r.msg];
+  });
+  return [head, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+$("run").onclick = run;
+$("clear").onclick = () => { $("refs").value = ""; $("results").hidden = true; results = []; setProgress(0, 0, ""); };
+$("example").onclick = () => {
+  $("refs").value = [
+    "1. Watson JD, Crick FH. Molecular structure of nucleic acids; a structure for deoxyribose nucleic acid. Nature. 1953;171(4356):737-8. doi:10.1038/171737a0. PMID: 13054692",
+    "2. Watson JD, Crick FH. Molecular structure of nucleic acids: a structure for deoxyribose nucleic acid. Nature 1953.",
+    "3. Rivera L, Chen M. Machine learning prediction of ketamine response in treatment resistant depression. J Fict Psychiatry. 2024;12:101-9. PMID: 99999999",
+    "4. Okafor A, Lindqvist P. Monoclonal antibody therapy in relapsed myeloma: a pooled analysis. Lancet Oncol. 2022. doi:10.1038/171737a0"
+  ].join("\n");
+};
+$("csv").onclick = () => {
+  const blob = new Blob([toCsv()], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "citation-check.csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("copy").onclick = async () => {
+  const text = results.map(r => `${r.n}. [${LABEL[r.status]}] ${r.ref}\n   ${r.msg}`).join("\n\n");
+  try { await navigator.clipboard.writeText(text); $("statusLine").textContent = "Report copied."; }
+  catch (e) { $("statusLine").textContent = "Copy failed. Use Download CSV instead."; }
+};
+</script>
+</body>
+</html>
