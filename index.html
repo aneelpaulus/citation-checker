@@ -79,26 +79,97 @@
   .filters button { padding: 6px 12px; font-size: 0.85rem; }
   .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 </style>
+<style>
+/* Medical AI Toolkit shared look (Nov 2026). Loaded after each page's own styles. */
+:root{
+  --bg:#f2f4f1;--panel:#ffffff;--ink:#17212a;--soft:#4a565e;--mute:#6b777e;--line:#e1e5e1;--line2:#cfd5d0;
+  --accent:#2c574b;--accent-ink:#ffffff;--accent-soft:#e3ece8;
+  --red:#9b2c2c;--redbg:#f8e9e7;--amb:#86560f;--ambbg:#f7eedc;--blue:#365a86;--bluebg:#e7edf5;--grn:#2f6b45;--grnbg:#e4efe7;
+  --card:var(--panel);--text:var(--ink);--muted:var(--mute);--accent-text:var(--accent-ink);
+  --ok:var(--grn);--okbg:var(--grnbg);--info:var(--blue);--infobg:var(--bluebg);--warn:var(--amb);--warnbg:var(--ambbg);--bad:var(--red);--badbg:var(--redbg);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua","URW Palladio L",P052,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12171a;--panel:#1a2125;--ink:#e9eeec;--soft:#c0c9c6;--mute:#93a09c;--line:#273035;--line2:#344048;
+  --accent:#8cc5b3;--accent-ink:#10201b;--accent-soft:#1f2f2b;
+  --red:#f0a19a;--redbg:#3a2120;--amb:#e8c27c;--ambbg:#352a17;--blue:#a9c3e6;--bluebg:#1d2a3a;--grn:#9dd3b0;--grnbg:#1c2e23}}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
+a{color:var(--accent);text-underline-offset:2px}
+nav.tk{display:flex;gap:18px;overflow-x:auto;white-space:nowrap;padding:12px 16px;font-size:13px;border-bottom:1px solid var(--line);scrollbar-width:none}
+nav.tk::-webkit-scrollbar{display:none}
+nav.tk a{color:var(--mute);text-decoration:none}nav.tk a:hover{color:var(--ink)}nav.tk a.here{color:var(--ink);font-weight:600}
+main{max-width:780px;margin:0 auto;padding:0 16px 24px}
+h1,h2,h3{font-family:var(--serif);color:var(--ink);letter-spacing:-.005em}
+h1{font-size:clamp(34px,7vw,50px);line-height:1.04;font-weight:500;letter-spacing:-.015em;margin:40px 0 12px}
+h2{font-size:23px;line-height:1.2;font-weight:600;margin:40px 0 8px}
+h3{font-size:18px;line-height:1.3;font-weight:600}
+.lede{font-size:18px;color:var(--soft);margin:0 0 24px;max-width:36em}
+label{font-weight:600;font-size:14px;margin-bottom:6px}
+input[type=text],input[type=email],input[type=number],input[type=password],select,textarea{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line2);border-radius:12px;padding:12px 14px;transition:border-color .15s,box-shadow .15s}
+input[type=text]:focus,input[type=email]:focus,input[type=number]:focus,input[type=password]:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input::placeholder,textarea::placeholder{color:var(--mute)}
+select{appearance:none;-webkit-appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--mute) 50%),linear-gradient(135deg,var(--mute) 50%,transparent 50%);background-position:calc(100% - 18px) 52%,calc(100% - 13px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.panel>label:first-child,.panel>div:first-child label{margin-top:0}
+button{font:500 15px/1.1 var(--sans);padding:11px 16px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s,color .15s,filter .15s}
+button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;border-radius:12px;padding:13px 22px}
+button.primary:hover:not(:disabled){color:var(--accent-ink);filter:brightness(1.08)}
+button.small{padding:7px 12px;font-size:13.5px}
+button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;border-radius:0}
+button.on,.filters button.on,.tabs button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card,.rx,.tot,.tile,.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.card{padding:16px 18px}
+.tot .num,.tile .num{font-family:var(--serif);font-weight:500}
+.badge{font-size:12.5px;font-weight:600;border-radius:999px;padding:3px 9px}
+.hint,.status{color:var(--mute);font-size:14px}
+.status.err{color:var(--red)}
+.chip{border:0;background:var(--accent-soft)}
+.caveat,.privacy{background:transparent;color:var(--soft);border:0;border-left:3px solid var(--line2);border-radius:0;padding:2px 0 2px 14px;margin:0 0 24px;font-size:14.5px}
+.callout{border-radius:12px}
+details>summary{cursor:pointer;color:var(--mute)}
+th{font-weight:600;color:var(--soft);font-size:13.5px}
+mark{border-radius:2px}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;color:var(--soft);font-weight:400}
+.switch input{appearance:none;-webkit-appearance:none;flex:none;width:36px;height:21px;border-radius:999px;background:var(--line2);position:relative;cursor:pointer;transition:background .15s;margin:0;border:0;padding:0}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{transform:translateX(15px)}
+footer{margin-top:48px;padding:20px 0 40px;border-top:1px solid var(--line);color:var(--mute);font-size:13px}
+footer p{margin:0 0 8px}
+footer details{margin:0 0 8px}
+footer details p{margin:8px 0 0;max-width:46em}
+@media (max-width:480px){.panel{padding:16px}h2{margin-top:32px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+@media print{nav.tk{display:none}body{background:#fff;color:#000}}
+</style>
 </head>
 <body>
+<nav class="tk" aria-label="Medical AI Toolkit"><a href="https://aneelpaulus.github.io/">Medical AI Toolkit</a><a href="https://aneelpaulus.github.io/citation-checker/" class="here" aria-current="page">Citation Checker</a><a href="https://aneelpaulus.github.io/adverse-event-explorer/">Adverse Event Explorer</a><a href="https://aneelpaulus.github.io/drug-target-tracker/">Drug Target Tracker</a><a href="https://aneelpaulus.github.io/drug-label-explainer/">Drug Label Explainer</a><a href="https://aneelpaulus.github.io/tumor-report-translator/">Tumor Report Translator</a><a href="https://aneelpaulus.github.io/supplement-interaction-checker/">Supplement Interaction Checker</a></nav>
 <main>
   <h1>Citation Checker</h1>
-  <p class="lede">Paste a reference list. Each reference is checked against PubMed and Crossref to confirm the paper exists and that its PubMed ID (PMID) or DOI points to the paper the reference describes. Useful for catching made-up or mislabeled citations, including those produced by AI tools.</p>
+  <p class="lede">Paste a reference list. Every PubMed ID and DOI is checked against PubMed and Crossref, so made-up or mislabeled citations stand out.</p>
 
+  <div class="panel">
   <label for="refs">References</label>
   <textarea id="refs" placeholder="Paste references here, one per line or as a numbered list."></textarea>
-  <p class="hint">Works with numbered lists, one reference per line, or references separated by blank lines. Up to 150 references per run.</p>
+  <p class="hint">Numbered, one per line, or separated by blank lines. Up to 150.</p>
 
   <details>
-    <summary>Optional: your email (speeds up Crossref lookups)</summary>
-    <p class="hint">Crossref routes requests that include a contact email to faster servers. It is sent only to Crossref with your queries and is not stored anywhere.</p>
+    <summary>Faster lookups (optional email)</summary>
+    <p class="hint">Crossref answers faster when you include an email. It goes only to Crossref and isn’t stored.</p>
     <input type="email" id="email" placeholder="you@example.org" autocomplete="email">
   </details>
 
   <div class="row">
-    <button class="primary" id="run">Check references</button>
-    <button id="example">Load example</button>
+    <button class="primary" id="run">Check</button>
+    <button id="example">Try an example</button>
     <button id="clear">Clear</button>
+  </div>
   </div>
   <div class="progress" id="progress"><div></div></div>
   <div class="status-line" id="statusLine" aria-live="polite"></div>
@@ -116,10 +187,11 @@
   </section>
 
   <footer>
-    <p><strong>How it decides.</strong> "Verified" means the ID exists and most of the found paper's title words appear in your reference. "Wrong ID" means the ID exists but belongs to a different paper. "Not found" means the ID does not exist, or a title search found nothing close. Matching is automatic and can be wrong, so always open the link before relying on a result.</p>
-    <p><strong>Privacy.</strong> Your references are sent only to the public PubMed (NCBI), Europe PMC, and Crossref services to look them up. Nothing is stored or sent anywhere else.</p>
-    <p>For research and educational use. Not a substitute for reading the cited papers. Open source under the MIT License. Built by Aneel Paulus, MD, MS.</p>
-  </footer>
+  <p>Not a substitute for reading the cited papers. Always open the link before relying on a result.</p>
+  <p>Sources: PubMed, Europe PMC and Crossref. Your references go only to these services and aren’t stored.</p>
+  <details><summary>How it decides</summary><p><strong>Verified:</strong> the ID exists and most of its title words appear in your reference. <strong>Wrong ID:</strong> the ID exists but belongs to a different paper. <strong>Not found:</strong> the ID doesn’t exist, or a title search found nothing close. Matching is automatic and can be wrong.</p></details>
+  <p>Free and open source under the MIT license. Built by Aneel Paulus, MD, MS. Part of the <a href="https://aneelpaulus.github.io/">Medical AI Toolkit</a>.</p>
+</footer>
 </main>
 
 <script>
@@ -336,7 +408,7 @@ function setProgress(done, total, text) {
 
 async function run() {
   const refs = splitRefs($("refs").value).slice(0, 150);
-  if (!refs.length) { $("statusLine").textContent = "Paste at least one reference first."; return; }
+  if (!refs.length) { $("statusLine").textContent = "Paste a reference first."; return; }
   $("run").disabled = true;
   results = [];
   activeFilter = "all";
@@ -441,8 +513,9 @@ $("csv").onclick = () => {
 $("copy").onclick = async () => {
   const text = results.map(r => `${r.n}. [${LABEL[r.status]}] ${r.ref}\n   ${r.msg}`).join("\n\n");
   try { await navigator.clipboard.writeText(text); $("statusLine").textContent = "Report copied."; }
-  catch (e) { $("statusLine").textContent = "Copy failed. Use Download CSV instead."; }
+  catch (e) { $("statusLine").textContent = "Couldn’t copy. Use Download CSV."; }
 };
+(function(){const P=new URLSearchParams(location.search);if(P.get("refs")){$("refs").value=P.get("refs");run();}})();
 </script>
 </body>
 </html>
