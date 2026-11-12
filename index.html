@@ -78,6 +78,13 @@
   .filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .filters button { padding: 6px 12px; font-size: 0.85rem; }
   .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .kit { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.85rem; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .kit a { color: var(--muted); text-decoration: none; }
+  .kit a:hover { color: var(--accent); text-decoration: underline; }
+  .kit a.here { color: var(--text); font-weight: 600; }
+  .kit a.home { color: var(--accent); font-weight: 700; }
+  .xlinks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.88rem; margin-top: 6px; }
+  .xlinks a { color: var(--accent); }
 </style>
 <style>
 /* Medical AI Toolkit shared look (Nov 2026). Loaded after each page's own styles. */
@@ -515,7 +522,14 @@ $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText(text); $("statusLine").textContent = "Report copied."; }
   catch (e) { $("statusLine").textContent = "Couldn’t copy. Use Download CSV."; }
 };
-(function(){const P=new URLSearchParams(location.search);if(P.get("refs")){$("refs").value=P.get("refs");run();}})();
+// Open with references from a link, e.g. ?refs=PMID:13054692 or ?refs=<url-encoded list>.
+// Pasted references are never written into the address, since they may be from unpublished work.
+(() => {
+  const q = new URLSearchParams(location.search);
+  const list = k => (q.get(k) || "").split(",").map(x => x.trim()).filter(Boolean);
+  const refs = (q.get("refs") || [...list("pmid").map(x => "PMID: " + x), ...list("doi").map(x => "doi:" + x)].join("\n")).slice(0, 20000);
+  if (refs) { $("refs").value = refs.replace(/\s*\|\s*/g, "\n"); run(); }
+})();
 </script>
 </body>
 </html>
